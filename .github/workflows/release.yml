@@ -1,0 +1,77 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Read base version
+        id: base
+        run: |
+          BASE=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+
+      - name: Derive build version
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=${{ steps.base.outputs.base }}+${{ github.run_number }}.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${{ steps.base.outputs.base }}-alpha.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: ./gradlew build -Pmod_version=${{ steps.version.outputs.version }}
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --list 'v*-alpha.*' --sort=-creatordate | head -n1)
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            if [ -n "$PREV_TAG" ]; then
+              echo "**Changes since ${PREV_TAG}:**"
+              echo ""
+              git log --pretty=format:'- %s (%h)' "${PREV_TAG}..HEAD"
+            else
+              echo "**Commit history:**"
+              echo ""
+              git log --pretty=format:'- %s (%h)' HEAD
+            fi
+            echo ""
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Mantle ${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          body: |
+            ## Mantle ${{ steps.version.outputs.version }} (alpha)
+
+            ${{ steps.changelog.outputs.changelog }}
+          files: build/libs/mantle-${{ steps.version.outputs.version }}.jar
