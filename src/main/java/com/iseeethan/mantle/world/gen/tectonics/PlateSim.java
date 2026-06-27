@@ -1,5 +1,6 @@
 package com.iseeethan.mantle.world.gen.tectonics;
 
+import com.iseeethan.mantle.world.GenStatus;
 import com.iseeethan.mantle.world.noise.GradientNoise;
 
 public final class PlateSim {
@@ -47,6 +48,10 @@ public final class PlateSim {
     private final long seed;
     private final GradientNoise warp;
     private final GradientNoise relief;
+    private final Strata strata;
+    private final Erodibility erodibility;
+    private final Karst karst;
+    private final Caves caves;
 
     private float[] raw;
     private final float[] elev;
@@ -67,13 +72,20 @@ public final class PlateSim {
         this.seed = seed;
         this.warp = new GradientNoise(seed ^ 0x9E3779B97F4A7C15L);
         this.relief = new GradientNoise(seed ^ 0xC2B2AE3D27D4EB4FL);
+        this.strata = new Strata(seed, SEA_Y);
+        this.erodibility = new Erodibility(seed, strata, SEA_Y);
+        this.karst = new Karst(seed, strata, SEA_Y, SHORE_Y);
+        this.caves = new Caves(seed, strata, FLOOR_Y);
         this.elev = new float[N * N];
         build();
     }
 
     private void build() {
+        GenStatus.begin();
+        GenStatus.stage("Generating plates");
         initPlates();
 
+        GenStatus.stage("Raising continents");
         raw = new float[N * N];
         final int threads = Math.max(1, Math.min(14, Runtime.getRuntime().availableProcessors()));
         Thread[] pool = new Thread[threads];
@@ -92,6 +104,7 @@ public final class PlateSim {
         }
         join(pool);
 
+        GenStatus.stage("Eroding terrain");
         float[] uplift = upliftField(raw);
         StreamPower.evolve(raw, N, CELL, (float) seaThresholdRaw(raw), uplift, STREAM_STEPS);
 
@@ -99,22 +112,38 @@ public final class PlateSim {
 
         mapToWorldY(raw);
 
+        GenStatus.stage("Weathering slopes");
         float[] reposeMul = reposeVariation(N);
         talusGuarantee(elev, N, MAX_STEP_BLOCKS, reposeMul);
 
-        StreamPower.evolve(elev, N, CELL, (float) SEA_Y, null, STREAM_RECARVE_STEPS);
+        GenStatus.stage("Carving river valleys");
+        float[] rockK = erodibility.build(elev, N, CELL, HALF);
+        float[] flux = new float[N * N];
+        StreamPower.evolve(elev, N, CELL, (float) SEA_Y, null, STREAM_RECARVE_STEPS, rockK, flux);
 
         Thermal.erode(elev, N, 12, MAX_STEP_BLOCKS, MAX_STEP_BLOCKS, 0f, reposeMul);
 
         smoothGridResidual(elev, N, 6);
         raw = null;
 
+        GenStatus.stage("Refining terrain");
         elevFine = upsampleElev();
         smoothGridResidual(elevFine, NH, 2);
+
+        GenStatus.stage("Computing rivers and lakes");
         hydro = Hydrology.build(elevFine, NH, SEA_Y, RIVER_ACCUM, CELLH, HALF);
+
+        GenStatus.stage("Dissolving karst");
+        karst.apply(elevFine, NH, CELLH, HALF);
+
+        GenStatus.done();
     }
 
     public Hydrology hydrology() { return hydro; }
+
+    public Strata strata() { return strata; }
+
+    public Caves caves() { return caves; }
 
     private float[] upliftField(float[] r) {
         float seaRaw = (float) seaThresholdRaw(r);

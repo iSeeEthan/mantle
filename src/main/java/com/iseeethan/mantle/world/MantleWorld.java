@@ -1,5 +1,6 @@
 package com.iseeethan.mantle.world;
 
+import com.iseeethan.mantle.world.gen.tectonics.Caves;
 import com.iseeethan.mantle.world.gen.tectonics.PlateSim;
 import com.iseeethan.mantle.world.gen.tectonics.Strata;
 
@@ -20,16 +21,24 @@ public final class MantleWorld {
 
     private final PlateSim sim;
     private final Strata strata;
+    private final Caves caves;
 
     private MantleWorld(long seed) {
         this.sim = new PlateSim(seed);
-        this.strata = new Strata(seed, SEA_Y);
+        this.strata = sim.strata();
+        this.caves = sim.caves();
     }
+
+    public PlateSim sim() { return sim; }
 
     public Strata strata() { return strata; }
 
     public Strata.Rock rockAt(int wx, int wz, int y) {
         return strata.typeAt(wx, wz, y, solidTopY(wx, wz));
+    }
+
+    public boolean caveAt(int wx, int y, int wz, int solidTop) {
+        return caves.carved(wx, y, wz, solidTop, sim.surfaceY(wx, wz));
     }
 
     public static MantleWorld forSeed(long seed) {

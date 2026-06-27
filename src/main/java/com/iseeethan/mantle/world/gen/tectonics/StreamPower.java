@@ -13,7 +13,14 @@ final class StreamPower {
 
     static final double DT = 1.0;
 
+    static final double DEPOSITION = 0.55;
+
     static void evolve(float[] h, int n, double cell, float seaY, float[] uplift, int steps) {
+        evolve(h, n, cell, seaY, uplift, steps, null, null);
+    }
+
+    static void evolve(float[] h, int n, double cell, float seaY, float[] uplift, int steps,
+                       float[] erodibility, float[] flux) {
         Drainage drain = new Drainage(n, seaY);
         float[] tmp = new float[n * n];
 
@@ -29,6 +36,9 @@ final class StreamPower {
             int[] down = drain.downstream;
             int[] accum = drain.accum;
             double[] distDown = drain.distDown;
+
+            if (flux != null) java.util.Arrays.fill(flux, 0f);
+
             for (int k = 0; k < order.length; k++) {
                 int i = order[k];
                 int j = down[i];
@@ -37,16 +47,48 @@ final class StreamPower {
                 double l = distDown[i] * cell;
                 if (l <= 0) continue;
 
-                double f = K * Math.pow(a, M) * DT / l;
+                double ke = erodibility != null ? K * erodibility[i] : K;
+                double f = ke * Math.pow(a, M) * DT / l;
                 double hj = h[j];
                 double hi = h[i];
                 if (hi <= hj) continue;
                 double updated = (hi + f * hj) / (1.0 + f);
                 if (updated < hj) updated = hj;
+                if (flux != null) flux[i] += (float) (hi - updated);
                 h[i] = (float) updated;
             }
 
+            if (flux != null) {
+                deposit(h, cell, drain, flux);
+            }
+
             diffuse(h, tmp, n);
+        }
+    }
+
+    private static void deposit(float[] h, double cell, Drainage drain, float[] flux) {
+        int[] order = drain.popOrder;
+        int[] down = drain.downstream;
+        int[] accum = drain.accum;
+        double[] distDown = drain.distDown;
+
+        for (int k = 0; k < order.length; k++) {
+            int i = order[k];
+            int j = down[i];
+            if (j < 0) continue;
+            double carry = flux[i];
+            if (carry <= 0) continue;
+            double l = distDown[i] * cell;
+            if (l <= 0) continue;
+
+            double slope = (h[i] - h[j]) / l;
+            double settleRate = DEPOSITION / (1.0 + accum[i] * Math.max(0.0, slope));
+            double settle = carry * settleRate;
+            double room = h[j] - h[i];
+            if (room > 0 && settle > room) settle = room;
+
+            h[i] += (float) settle;
+            flux[j] += (float) (carry - settle);
         }
     }
 

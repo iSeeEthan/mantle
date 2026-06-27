@@ -95,6 +95,9 @@ public class MantleChunkGenerator extends ChunkGenerator {
                 for (int y = minY; y <= Math.max(stoneTop, waterTop); y++) {
                     BlockState state;
                     if (y <= stoneTop) {
+                        if (w.caveAt(wx, y, wz, stoneTop)) {
+                            continue;
+                        }
                         state = stone;
                     } else if (y <= waterTop) {
                         state = water;
