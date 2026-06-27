@@ -1,3 +1,14 @@
 {
-  "generator.mantle.mantle": "Mantle"
+  "generator.mantle.mantle": "Mantle",
+  "block.mantle.sedimentary_stone": "Sedimentary Stone",
+  "block.mantle.igneous_stone": "Igneous Stone",
+  "block.mantle.metamorphic_stone": "Metamorphic Stone",
+  "block.mantle.basement_stone": "Basement Stone",
+  "itemGroup.mantle.stone": "Mantle Stone",
+  "mantle.customize.title": "Mantle World Settings",
+  "mantle.customize.mode": "Terrain blocks",
+  "mantle.customize.flavored": "Flavored",
+  "mantle.customize.debug": "Debug",
+  "mantle.customize.flavored.desc": "Geology-placed rock, grass surface, and water.",
+  "mantle.customize.debug.desc": "Plain stone and water only, for viewing raw terrain."
 }

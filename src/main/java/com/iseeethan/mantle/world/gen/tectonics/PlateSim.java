@@ -21,12 +21,6 @@ public final class PlateSim {
     private static final int NH = N * HYDRO_MULT;
     private static final double CELLH = (double) WORLD / NH;
 
-    private static final int PLATE_GRID = 6;
-    private static final int PLATE_COUNT = PLATE_GRID * PLATE_GRID;
-    private static final double OCEANIC_FRACTION = 0.55;
-
-    private static final double RANGE_WIDTH = 700.0;
-
     private static final double WARP_BROAD = 520.0;
     private static final double WARP_FINE = 90.0;
 
@@ -48,6 +42,10 @@ public final class PlateSim {
     private final long seed;
     private final GradientNoise warp;
     private final GradientNoise relief;
+    private final PlateField plates;
+    private final Boundary boundary;
+    private final Folding folding;
+    private final Faulting faulting;
     private final Strata strata;
     private final Erodibility erodibility;
     private final Karst karst;
@@ -61,17 +59,14 @@ public final class PlateSim {
 
     private static final int RIVER_ACCUM = 1600;
 
-    private final double[] px = new double[PLATE_COUNT];
-    private final double[] pz = new double[PLATE_COUNT];
-    private final double[] pvx = new double[PLATE_COUNT];
-    private final double[] pvz = new double[PLATE_COUNT];
-    private final double[] pbase = new double[PLATE_COUNT];
-    private final boolean[] oceanic = new boolean[PLATE_COUNT];
-
     public PlateSim(long seed) {
         this.seed = seed;
         this.warp = new GradientNoise(seed ^ 0x9E3779B97F4A7C15L);
         this.relief = new GradientNoise(seed ^ 0xC2B2AE3D27D4EB4FL);
+        this.plates = new PlateField(seed, WORLD, HALF);
+        this.boundary = new Boundary(seed);
+        this.folding = new Folding(seed, SEA_Y);
+        this.faulting = new Faulting(seed, SEA_Y);
         this.strata = new Strata(seed, SEA_Y);
         this.erodibility = new Erodibility(seed, strata, SEA_Y);
         this.karst = new Karst(seed, strata, SEA_Y, SHORE_Y);
@@ -82,9 +77,6 @@ public final class PlateSim {
 
     private void build() {
         GenStatus.begin();
-        GenStatus.stage("Generating plates");
-        initPlates();
-
         GenStatus.stage("Raising continents");
         raw = new float[N * N];
         final int threads = Math.max(1, Math.min(14, Runtime.getRuntime().availableProcessors()));
@@ -92,11 +84,12 @@ public final class PlateSim {
         for (int ti = 0; ti < threads; ti++) {
             final int t = ti;
             pool[t] = new Thread(() -> {
+                PlateField.Contact contact = new PlateField.Contact();
                 for (int j = t; j < N; j += threads) {
                     for (int i = 0; i < N; i++) {
                         double wx = (i + 0.5) * CELL - HALF;
                         double wz = (j + 0.5) * CELL - HALF;
-                        raw[j * N + i] = (float) rawElevation(wx, wz);
+                        raw[j * N + i] = (float) rawElevation(wx, wz, contact);
                     }
                 }
             });
@@ -115,6 +108,13 @@ public final class PlateSim {
         GenStatus.stage("Weathering slopes");
         float[] reposeMul = reposeVariation(N);
         talusGuarantee(elev, N, MAX_STEP_BLOCKS, reposeMul);
+
+        GenStatus.stage("Folding strata");
+        folding.apply(elev, N, CELL, HALF);
+
+        GenStatus.stage("Fracturing faults");
+        faulting.apply(elev, N, CELL, HALF);
+        Thermal.erode(elev, N, 18, MAX_STEP_BLOCKS, MAX_STEP_BLOCKS, 0f, reposeMul);
 
         GenStatus.stage("Carving river valleys");
         float[] rockK = erodibility.build(elev, N, CELL, HALF);
@@ -144,6 +144,50 @@ public final class PlateSim {
     public Strata strata() { return strata; }
 
     public Caves caves() { return caves; }
+
+    private double warpX(double wx, double wz) {
+        return wx + warp.fbm(wx / 1600.0, wz / 1600.0, 4, 2.0, 0.5) * WARP_BROAD
+                  + warp.noise2(wx / 260.0, wz / 260.0) * WARP_FINE;
+    }
+
+    private double warpZ(double wx, double wz) {
+        return wz + warp.fbm((wx + 7000) / 1600.0, (wz - 7000) / 1600.0, 4, 2.0, 0.5) * WARP_BROAD
+                  + warp.noise2((wx - 4000) / 260.0, (wz + 4000) / 260.0) * WARP_FINE;
+    }
+
+    public boolean isFaultScarp(double wx, double wz) {
+        double surf = surfaceY(wx, wz);
+        if (surf < SEA_Y + 4) return false;
+        return faulting.scarpStrength(wx, wz, surf) > 1.2;
+    }
+
+    public boolean isFoldRidge(double wx, double wz) {
+        double surf = surfaceY(wx, wz);
+        if (surf < SEA_Y + 4) return false;
+        return folding.ridgeStrength(wx, wz, surf) > 8.0;
+    }
+
+    public boolean isRift(double wx, double wz) {
+        return boundaryType(wx, wz) == BoundaryType.DIVERGENT && nearBoundary(wx, wz, 420.0);
+    }
+
+    public boolean isMountainBelt(double wx, double wz) {
+        double surf = surfaceY(wx, wz);
+        if (surf < SEA_Y + 60) return false;
+        return boundaryType(wx, wz) == BoundaryType.CONVERGENT && nearBoundary(wx, wz, 700.0);
+    }
+
+    private BoundaryType boundaryType(double wx, double wz) {
+        PlateField.Contact c = new PlateField.Contact();
+        plates.evaluate(warpX(wx, wz), warpZ(wx, wz), c);
+        return c.type;
+    }
+
+    private boolean nearBoundary(double wx, double wz, double width) {
+        PlateField.Contact c = new PlateField.Contact();
+        plates.evaluate(warpX(wx, wz), warpZ(wx, wz), c);
+        return Math.abs(c.boundaryDist) < width;
+    }
 
     private float[] upliftField(float[] r) {
         float seaRaw = (float) seaThresholdRaw(r);
@@ -189,80 +233,14 @@ public final class PlateSim {
         }
     }
 
-    private void initPlates() {
-        java.util.Random rnd = new java.util.Random(seed * 0x2545F4914F6CDD1DL + 1);
-        double tile = (double) WORLD / PLATE_GRID;
-        int k = 0;
-        for (int gz = 0; gz < PLATE_GRID; gz++) {
-            for (int gx = 0; gx < PLATE_GRID; gx++) {
-                double cx = (gx + 0.5) * tile - HALF;
-                double cz = (gz + 0.5) * tile - HALF;
-                px[k] = cx + (rnd.nextDouble() - 0.5) * tile * 0.85;
-                pz[k] = cz + (rnd.nextDouble() - 0.5) * tile * 0.85;
+    private double rawElevation(double wx, double wz, PlateField.Contact contact) {
 
-                double ang = rnd.nextDouble() * Math.PI * 2.0;
-                double speed = 0.4 + rnd.nextDouble() * 0.6;
-                pvx[k] = Math.cos(ang) * speed;
-                pvz[k] = Math.sin(ang) * speed;
+        double sx = warpX(wx, wz);
+        double sz = warpZ(wx, wz);
 
-                boolean isOcean = rnd.nextDouble() < OCEANIC_FRACTION;
-                oceanic[k] = isOcean;
-                pbase[k] = isOcean
-                        ? -0.62 + rnd.nextDouble() * 0.16
-                        :  0.18 + rnd.nextDouble() * 0.30;
-                k++;
-            }
-        }
-    }
-
-    private double rawElevation(double wx, double wz) {
-
-        double warpX = warp.fbm(wx / 1600.0, wz / 1600.0, 4, 2.0, 0.5) * WARP_BROAD
-                     + warp.noise2(wx / 260.0, wz / 260.0) * WARP_FINE;
-        double warpZ = warp.fbm((wx + 7000) / 1600.0, (wz - 7000) / 1600.0, 4, 2.0, 0.5) * WARP_BROAD
-                     + warp.noise2((wx - 4000) / 260.0, (wz + 4000) / 260.0) * WARP_FINE;
-        double sx = wx + warpX;
-        double sz = wz + warpZ;
-
-        int n1 = -1, n2 = -1;
-        double d1 = Double.MAX_VALUE, d2 = Double.MAX_VALUE;
-        for (int p = 0; p < PLATE_COUNT; p++) {
-            double dx = sx - px[p];
-            double dz = sz - pz[p];
-            double d = dx * dx + dz * dz;
-            if (d < d1) { d2 = d1; n2 = n1; d1 = d; n1 = p; }
-            else if (d < d2) { d2 = d; n2 = p; }
-        }
-        double dist1 = Math.sqrt(d1);
-        double dist2 = Math.sqrt(d2);
-
-        double w1 = 1.0 / (dist1 + 1.0);
-        double w2 = 1.0 / (dist2 + 1.0);
-        double base = (pbase[n1] * w1 + pbase[n2] * w2) / (w1 + w2);
-
-        double boundaryDist = (dist2 - dist1) * 0.5;
-        double ramp = smoothstep(RANGE_WIDTH, 0.0, boundaryDist);
-
-        double nx = px[n2] - px[n1], nz = pz[n2] - pz[n1];
-        double nlen = Math.hypot(nx, nz);
-        if (nlen > 1e-6) { nx /= nlen; nz /= nlen; }
-        double closing = (pvx[n1] - pvx[n2]) * nx + (pvz[n1] - pvz[n2]) * nz;
-
-        boolean o1 = oceanic[n1], o2 = oceanic[n2];
-        double uplift;
-        if (closing > 0) {
-            if (!o1 && !o2)       uplift = closing * 2.4;
-            else if (o1 && o2)    uplift = closing * 0.9;
-            else {
-                boolean thisContinental = (boundaryDist > 0) ? !o1 : !o2;
-                uplift = thisContinental ? closing * 1.9 : -closing * 1.2;
-            }
-        } else {
-            uplift = closing * 0.5;
-        }
-
-        double crest = relief.ridged(sx / 1300.0, sz / 1300.0, 4, 2.05, 0.5);
-        double boundary = uplift * ramp * (0.70 + 0.55 * crest);
+        plates.evaluate(sx, sz, contact);
+        double base = contact.base;
+        double boundary = this.boundary.contribution(sx, sz, contact);
 
         double landish = clamp((base + boundary + 0.35) * 1.6, 0.0, 1.0);
         double continental = clamp((base + 0.4) * 1.4, 0.0, 1.0);
@@ -436,11 +414,6 @@ public final class PlateSim {
         }
         join(pool);
         return e;
-    }
-
-    private static double smoothstep(double edge0, double edge1, double x) {
-        double t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
-        return t * t * (3 - 2 * t);
     }
 
     private static double clamp(double v, double lo, double hi) {

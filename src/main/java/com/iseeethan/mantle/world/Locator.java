@@ -8,7 +8,8 @@ public final class Locator {
 
     public enum Target {
         RIVER, LAKE, RIVER_MOUTH, COAST, OCEAN, PEAK, DEEP_OCEAN, PLAINS, CLIFF,
-        CAVE, SINKHOLE, BASEMENT, IGNEOUS, METAMORPHIC, SEDIMENTARY, COASTAL_SPAWN
+        CAVE, SINKHOLE, BASEMENT, IGNEOUS, METAMORPHIC, SEDIMENTARY,
+        FAULT, FOLD, RIFT, MOUNTAIN_BELT, COASTAL_SPAWN
     }
 
     public static final class Found {
@@ -49,6 +50,10 @@ public final class Locator {
             case IGNEOUS:      return scanSurface(fromX, fromZ, (x, z) -> exposedRock(x, z) == Strata.Rock.IGNEOUS);
             case METAMORPHIC:  return scanSurface(fromX, fromZ, (x, z) -> exposedRock(x, z) == Strata.Rock.METAMORPHIC);
             case SEDIMENTARY:  return scanSurface(fromX, fromZ, (x, z) -> exposedRock(x, z) == Strata.Rock.SEDIMENTARY);
+            case FAULT:        return scanSurface(fromX, fromZ, 6, (x, z) -> sim.isFaultScarp(x, z));
+            case FOLD:         return scanSurface(fromX, fromZ, (x, z) -> sim.isFoldRidge(x, z));
+            case RIFT:         return scanSurface(fromX, fromZ, (x, z) -> sim.isRift(x, z));
+            case MOUNTAIN_BELT:return scanSurface(fromX, fromZ, (x, z) -> sim.isMountainBelt(x, z));
             case COASTAL_SPAWN:return findCoastalSpawn();
             default:           return null;
         }
@@ -87,7 +92,10 @@ public final class Locator {
     }
 
     private Found scanSurface(int fromX, int fromZ, SurfaceTest test) {
-        final int step = 16;
+        return scanSurface(fromX, fromZ, 16, test);
+    }
+
+    private Found scanSurface(int fromX, int fromZ, int step, SurfaceTest test) {
         for (int r = 0; r <= half; r += step) {
             Found f = ringSearch(fromX, fromZ, r, step, test);
             if (f != null) return f;

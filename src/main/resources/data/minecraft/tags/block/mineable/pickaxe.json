@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "mantle:sedimentary_stone",
+    "mantle:igneous_stone",
+    "mantle:metamorphic_stone",
+    "mantle:basement_stone"
+  ]
+}

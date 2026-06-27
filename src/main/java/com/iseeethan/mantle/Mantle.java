@@ -1,5 +1,6 @@
 package com.iseeethan.mantle;
 
+import com.iseeethan.mantle.block.MantleBlocks;
 import com.iseeethan.mantle.command.MantleCommand;
 import com.iseeethan.mantle.world.Locator;
 import com.iseeethan.mantle.world.MantleWorld;
@@ -25,6 +26,7 @@ public class Mantle {
 
     public Mantle(IEventBus modEventBus) {
         MantleGenerators.register(modEventBus);
+        MantleBlocks.register(modEventBus);
         NeoForge.EVENT_BUS.register(this);
         LOGGER.info("Mantle is loading");
     }

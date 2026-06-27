@@ -26,12 +26,14 @@ public final class Strata {
     private static final double[] THICK = { 28, 42, 70, 95 };
 
     private final GradientNoise fold;
+    private final Folding folding;
 
     private final double seaY;
 
     public Strata(long seed, double seaY) {
 
         this.fold = new GradientNoise(seed ^ 0x7F4A7C159E3779B9L);
+        this.folding = new Folding(seed, seaY);
         this.seaY = seaY;
     }
 
@@ -42,7 +44,9 @@ public final class Strata {
         double folds = fold.fbm(wx / 1500.0, wz / 1500.0, 4, 2.0, 0.5) * 120.0
                      + fold.fbm((wx + 5000) / 400.0, (wz - 5000) / 400.0, 3, 2.1, 0.5) * 45.0;
 
-        return seaY + uplift * 1.55 + folds;
+        double tectonicFold = folding.displacement(wx, wz, surfaceY) * 2.5;
+
+        return seaY + uplift * 1.55 + folds + tectonicFold;
     }
 
     public Rock typeAt(double wx, double wz, double y, double surfaceY) {
