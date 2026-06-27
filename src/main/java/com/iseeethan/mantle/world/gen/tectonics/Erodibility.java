@@ -33,7 +33,7 @@ final class Erodibility {
         return k;
     }
 
-    private double sample(double wx, double wz, double surfaceY) {
+    double sample(double wx, double wz, double surfaceY) {
         double topRock = resistance(strata.typeAt(wx, wz, surfaceY, surfaceY));
         double deepRock = resistance(strata.typeAt(wx, wz, surfaceY - EXPOSURE_DEPTH, surfaceY));
 

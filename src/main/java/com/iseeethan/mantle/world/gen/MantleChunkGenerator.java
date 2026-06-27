@@ -42,9 +42,9 @@ public class MantleChunkGenerator extends ChunkGenerator {
     private final BlockState stone = Blocks.STONE.defaultBlockState();
     private final BlockState water = Blocks.WATER.defaultBlockState();
     private final BlockState grassBlock = Blocks.GRASS_BLOCK.defaultBlockState();
-    private final BlockState dirt = Blocks.DIRT.defaultBlockState();
 
     private volatile java.util.EnumMap<Strata.Rock, BlockState> rockStates;
+    private volatile java.util.EnumMap<com.iseeethan.mantle.world.gen.tectonics.Soil.Type, BlockState> soilStates;
 
     private BlockState rockState(Strata.Rock rock) {
         java.util.EnumMap<Strata.Rock, BlockState> map = rockStates;
@@ -56,6 +56,18 @@ public class MantleChunkGenerator extends ChunkGenerator {
             rockStates = map;
         }
         return map.get(rock);
+    }
+
+    private BlockState soilState(com.iseeethan.mantle.world.gen.tectonics.Soil.Type type) {
+        java.util.EnumMap<com.iseeethan.mantle.world.gen.tectonics.Soil.Type, BlockState> map = soilStates;
+        if (map == null) {
+            map = new java.util.EnumMap<>(com.iseeethan.mantle.world.gen.tectonics.Soil.Type.class);
+            for (com.iseeethan.mantle.world.gen.tectonics.Soil.Type t : com.iseeethan.mantle.world.gen.tectonics.Soil.Type.values()) {
+                map.put(t, MantleBlocks.forSoil(t).defaultBlockState());
+            }
+            soilStates = map;
+        }
+        return map.get(type);
     }
 
     private final AtomicLong worldSeed = new AtomicLong(Long.MIN_VALUE);
@@ -105,7 +117,9 @@ public class MantleChunkGenerator extends ChunkGenerator {
     private static final int VEGETATION_LINE = 480;
     private static final int VEGETATION_FADE = 190;
     private static final double TRANSITION_BAND = 0.34;
-    private static final int SOIL_DEPTH = 4;
+
+    private final ThreadLocal<com.iseeethan.mantle.world.gen.tectonics.Soil.Sample> soilTL =
+            ThreadLocal.withInitial(com.iseeethan.mantle.world.gen.tectonics.Soil.Sample::new);
 
     private int soilTop(MantleWorld w, int wx, int wz, int stoneTop, boolean hasWater) {
         if (debug) return Integer.MIN_VALUE;
@@ -139,12 +153,24 @@ public class MantleChunkGenerator extends ChunkGenerator {
         return t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
     }
 
-    private BlockState surfaceState(MantleWorld w, int wx, int wz, int y, int stoneTop, int soilTop) {
+    private final ThreadLocal<Strata.Column> strataColTL =
+            ThreadLocal.withInitial(Strata.Column::new);
+    private final ThreadLocal<com.iseeethan.mantle.world.gen.tectonics.Caves.Column> cavesColTL =
+            ThreadLocal.withInitial(com.iseeethan.mantle.world.gen.tectonics.Caves.Column::new);
+
+    private BlockState surfaceState(MantleWorld w, int wx, int wz, int y, int stoneTop, int soilTop,
+                                    Strata.Column strataCol, int soilDepth,
+                                    com.iseeethan.mantle.world.gen.tectonics.Soil.Type soilType) {
         if (debug) return stone;
-        if (soilTop != Integer.MIN_VALUE && y <= soilTop && y > soilTop - SOIL_DEPTH) {
-            return y == soilTop ? grassBlock : dirt;
+        if (soilTop != Integer.MIN_VALUE && y <= soilTop) {
+            if (y == soilTop) {
+                return grassBlock;
+            }
+            if (y > soilTop - soilDepth) {
+                return soilState(soilType);
+            }
         }
-        return rockState(w.rockAt(wx, wz, y));
+        return rockState(w.strata().typeAt(strataCol, y));
     }
 
     @Override
@@ -174,13 +200,26 @@ public class MantleChunkGenerator extends ChunkGenerator {
 
                 int soilTop = soilTop(w, wx, wz, stoneTop, col.hasWater);
 
+                double surfaceY = w.sim().surfaceY(wx, wz);
+                Strata.Column strataCol = w.strata().column(wx, wz, surfaceY, strataColTL.get());
+                var cavesCol = w.caves().column(wx, wz, stoneTop, surfaceY, cavesColTL.get());
+
+                int soilDepth = 1;
+                com.iseeethan.mantle.world.gen.tectonics.Soil.Type soilType =
+                        com.iseeethan.mantle.world.gen.tectonics.Soil.Type.LOAM;
+                if (soilTop != Integer.MIN_VALUE) {
+                    var s = w.sim().soil().sample(wx, wz, stoneTop, soilTL.get());
+                    soilDepth = Math.max(1, s.depth);
+                    soilType = s.type;
+                }
+
                 for (int y = minY; y <= Math.max(stoneTop, waterTop); y++) {
                     BlockState state;
                     if (y <= stoneTop) {
-                        if (w.caveAt(wx, y, wz, stoneTop)) {
+                        if (w.caves().carved(cavesCol, y)) {
                             continue;
                         }
-                        state = surfaceState(w, wx, wz, y, stoneTop, soilTop);
+                        state = surfaceState(w, wx, wz, y, stoneTop, soilTop, strataCol, soilDepth, soilType);
                     } else if (y <= waterTop) {
                         state = water;
                     } else {
@@ -242,6 +281,13 @@ public class MantleChunkGenerator extends ChunkGenerator {
         return MantleWorld.HEIGHT;
     }
 
+    private final ThreadLocal<com.iseeethan.mantle.world.gen.tectonics.Flora.Cover> coverTL =
+            ThreadLocal.withInitial(com.iseeethan.mantle.world.gen.tectonics.Flora.Cover::new);
+    private final ThreadLocal<com.iseeethan.mantle.world.gen.tectonics.Soil.Sample> vegSoilTL =
+            ThreadLocal.withInitial(com.iseeethan.mantle.world.gen.tectonics.Soil.Sample::new);
+    private final ThreadLocal<com.iseeethan.mantle.world.gen.tectonics.Climate.Sample> climateTL =
+            ThreadLocal.withInitial(com.iseeethan.mantle.world.gen.tectonics.Climate.Sample::new);
+
     @Override
     public void buildSurface(WorldGenRegion region, StructureManager structures, RandomState random, ChunkAccess chunk) {
         if (debug) return;
@@ -249,47 +295,74 @@ public class MantleChunkGenerator extends ChunkGenerator {
         int chunkX = chunk.getPos().getMinBlockX();
         int chunkZ = chunk.getPos().getMinBlockZ();
         BlockState grass = grassBlock;
-        BlockState shortGrass = Blocks.SHORT_GRASS.defaultBlockState();
-        net.minecraft.world.level.block.DoublePlantBlock tallPlant =
-                (net.minecraft.world.level.block.DoublePlantBlock) Blocks.TALL_GRASS;
+
+        MantleWorld w = world();
+        var sim = w.sim();
+        var flora = sim.flora();
+        var climate = sim.climate();
 
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int lx = 0; lx < 16; lx++) {
             for (int lz = 0; lz < 16; lz++) {
                 int wx = chunkX + lx;
                 int wz = chunkZ + lz;
+                if (!w.inWorld(wx, wz)) continue;
 
                 int top = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, lx, lz);
                 pos.set(lx, top, lz);
                 if (!chunk.getBlockState(pos).is(grass.getBlock())) continue;
+                if (top + 1 >= chunk.getMaxBuildHeight()) continue;
 
-                int plantY = top + 1;
-                if (plantY >= chunk.getMaxBuildHeight()) continue;
+                var soil = sim.soil().sample(wx, wz, top, vegSoilTL.get());
+                var cs = climate.sample(wx, wz, climateTL.get());
+                double rain = cs.rainfall;
+                double temp = cs.temperature;
+                double slope = sim.macroSlope(wx, wz);
+                int flow = sim.flowAccumAt(wx, wz);
 
-                long h = plantNoise(wx, wz);
-                int roll = (int) (h % 100);
-                if (roll < 38) {
-                    boolean tall = (h >>> 8 & 7) == 0;
-                    if (tall && plantY + 1 < chunk.getMaxBuildHeight()) {
-                        net.minecraft.world.level.block.DoublePlantBlock.placeAt(
-                                region, tallPlant.defaultBlockState(), pos.set(lx, plantY, lz), 2);
-                    } else {
-                        chunk.setBlockState(pos.set(lx, plantY, lz), shortGrass, false);
-                    }
-                }
+                var cover = flora.cover(wx, wz, top, soil, rain, temp, slope,
+                        Math.min(1.0, flow / 80.0), coverTL.get());
+
+                Vegetation.undergrowth(region, wx, wz, top, cover);
             }
         }
     }
 
-    private static long plantNoise(int wx, int wz) {
-        long h = (wx * 0x9E3779B97F4A7C15L) ^ (wz * 0xC2B2AE3D27D4EB4FL);
-        h ^= h >>> 29; h *= 0xBF58476D1CE4E5B9L; h ^= h >>> 32;
-        return h & Long.MAX_VALUE;
-    }
-
     @Override
     public void applyBiomeDecoration(WorldGenLevel level, ChunkAccess chunk, StructureManager structures) {
+        if (debug) return;
 
+        int chunkX = chunk.getPos().getMinBlockX();
+        int chunkZ = chunk.getPos().getMinBlockZ();
+
+        MantleWorld w = world();
+        var sim = w.sim();
+        var flora = sim.flora();
+        var climate = sim.climate();
+
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int lx = 0; lx < 16; lx++) {
+            for (int lz = 0; lz < 16; lz++) {
+                int wx = chunkX + lx;
+                int wz = chunkZ + lz;
+                if (!w.inWorld(wx, wz)) continue;
+
+                int top = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, lx, lz);
+                if (top + 1 >= chunk.getMaxBuildHeight()) continue;
+                pos.set(lx, top, lz);
+                if (!chunk.getBlockState(pos).is(grassBlock.getBlock())) continue;
+
+                var soil = sim.soil().sample(wx, wz, top, vegSoilTL.get());
+                var cs = climate.sample(wx, wz, climateTL.get());
+                double slope = sim.macroSlope(wx, wz);
+                int flow = sim.flowAccumAt(wx, wz);
+
+                var cover = flora.cover(wx, wz, top, soil, cs.rainfall, cs.temperature, slope,
+                        Math.min(1.0, flow / 80.0), coverTL.get());
+
+                Vegetation.tree(level, wx, wz, top, cover);
+            }
+        }
     }
 
     @Override

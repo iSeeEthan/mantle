@@ -7,9 +7,9 @@ final class StreamPower {
     static final double M = 0.5;
     static final double N = 1.0;
 
-    static final double K = 0.45;
+    static final double K = 0.56;
 
-    static final double D = 0.18;
+    static final double D = 0.125;
 
     static final double DT = 1.0;
 

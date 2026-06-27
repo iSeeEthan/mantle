@@ -1,0 +1,32 @@
+{
+  "has_precipitation": false,
+  "temperature": 0.9,
+  "downfall": 0.95,
+  "effects": {
+    "fog_color": 4497544,
+    "water_color": 4173984,
+    "water_fog_color": 664880,
+    "sky_color": 9488584,
+    "grass_color": 6342720,
+    "foliage_color": 4372511,
+    "mood_sound": {
+      "sound": "minecraft:ambient.cave",
+      "tick_delay": 6000,
+      "block_search_extent": 8,
+      "offset": 2.0
+    }
+  },
+  "spawners": {
+      "monster": [{ "type": "minecraft:zombie", "weight": 95, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:skeleton", "weight": 100, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:spider", "weight": 100, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:creeper", "weight": 100, "minCount": 4, "maxCount": 4 }],
+      "creature": [{ "type": "minecraft:frog", "weight": 10, "minCount": 2, "maxCount": 5 }, { "type": "minecraft:chicken", "weight": 10, "minCount": 4, "maxCount": 4 }],
+      "ambient": [],
+      "axolotls": [],
+      "underground_water_creature": [],
+      "water_creature": [],
+      "water_ambient": [],
+      "misc": []
+    },
+  "spawn_costs": {},
+  "carvers": {},
+  "features": []
+}

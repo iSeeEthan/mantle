@@ -51,10 +51,28 @@ public final class Strata {
 
     public Rock typeAt(double wx, double wz, double y, double surfaceY) {
         double top = structuralTop(wx, wz, surfaceY);
+        double jitter = 1.0 + 0.25 * fold.noise2(wx / 220.0, wz / 220.0, 7);
+        return layerAt(top, jitter, y);
+    }
+
+    public static final class Column {
+        double top;
+        double jitter;
+    }
+
+    public Column column(double wx, double wz, double surfaceY, Column out) {
+        out.top = structuralTop(wx, wz, surfaceY);
+        out.jitter = 1.0 + 0.25 * fold.noise2(wx / 220.0, wz / 220.0, 7);
+        return out;
+    }
+
+    public Rock typeAt(Column ctx, double y) {
+        return layerAt(ctx.top, ctx.jitter, y);
+    }
+
+    private static Rock layerAt(double top, double jitter, double y) {
         double depth = top - y;
         if (depth <= 0) return LAYERS[0];
-
-        double jitter = 1.0 + 0.25 * fold.noise2(wx / 220.0, wz / 220.0, 7);
 
         double base = 0;
         for (int i = 0; i < THICK.length; i++) {

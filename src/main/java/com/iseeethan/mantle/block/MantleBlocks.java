@@ -1,6 +1,7 @@
 package com.iseeethan.mantle.block;
 
 import com.iseeethan.mantle.Mantle;
+import com.iseeethan.mantle.world.gen.tectonics.Soil;
 import com.iseeethan.mantle.world.gen.tectonics.Strata;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -33,18 +34,27 @@ public final class MantleBlocks {
     private static final Map<Strata.Rock, Supplier<Block>> BY_ROCK =
             new EnumMap<>(Strata.Rock.class);
 
+    private static final Map<Soil.Type, Supplier<Block>> BY_SOIL =
+            new EnumMap<>(Soil.Type.class);
+
     private static final List<Supplier<? extends Item>> TAB_ITEMS = new ArrayList<>();
 
     static {
-        register(Strata.Rock.SEDIMENTARY, "sedimentary_stone");
-        register(Strata.Rock.IGNEOUS, "igneous_stone");
-        register(Strata.Rock.METAMORPHIC, "metamorphic_stone");
-        register(Strata.Rock.BASEMENT, "basement_stone");
+        registerRock(Strata.Rock.SEDIMENTARY, "sedimentary_stone");
+        registerRock(Strata.Rock.IGNEOUS, "igneous_stone");
+        registerRock(Strata.Rock.METAMORPHIC, "metamorphic_stone");
+        registerRock(Strata.Rock.BASEMENT, "basement_stone");
+
+        registerSoil(Soil.Type.LOAM, "loam_dirt");
+        registerSoil(Soil.Type.SILT, "silt_dirt");
+        registerSoil(Soil.Type.CLAY, "clay_dirt");
+        registerSoil(Soil.Type.SANDY, "sandy_dirt");
+        registerSoil(Soil.Type.STONY, "stony_dirt");
     }
 
-    public static final Supplier<CreativeModeTab> STONE_TAB = TABS.register("stone", () ->
+    public static final Supplier<CreativeModeTab> TERRAIN_TAB = TABS.register("terrain", () ->
             CreativeModeTab.builder()
-                    .title(Component.translatable("itemGroup.mantle.stone"))
+                    .title(Component.translatable("itemGroup.mantle.terrain"))
                     .icon(() -> MantleBlocks.forRock(Strata.Rock.SEDIMENTARY).asItem().getDefaultInstance())
                     .displayItems((params, output) -> {
                         for (Supplier<? extends Item> item : TAB_ITEMS) {
@@ -55,7 +65,7 @@ public final class MantleBlocks {
 
     private MantleBlocks() {}
 
-    private static void register(Strata.Rock rock, String name) {
+    private static void registerRock(Strata.Rock rock, String name) {
         Supplier<Block> block = BLOCKS.register(name,
                 () -> new Block(BlockBehaviour.Properties.ofFullCopy(Blocks.STONE)));
         Supplier<Item> item = ITEMS.register(name,
@@ -64,9 +74,23 @@ public final class MantleBlocks {
         TAB_ITEMS.add(item);
     }
 
+    private static void registerSoil(Soil.Type type, String name) {
+        Supplier<Block> block = BLOCKS.register(name,
+                () -> new Block(BlockBehaviour.Properties.ofFullCopy(Blocks.DIRT)));
+        Supplier<Item> item = ITEMS.register(name,
+                () -> new BlockItem(block.get(), new Item.Properties()));
+        BY_SOIL.put(type, block);
+        TAB_ITEMS.add(item);
+    }
+
     public static Block forRock(Strata.Rock rock) {
         Supplier<Block> s = BY_ROCK.get(rock);
         return s != null ? s.get() : Blocks.STONE;
+    }
+
+    public static Block forSoil(Soil.Type type) {
+        Supplier<Block> s = BY_SOIL.get(type);
+        return s != null ? s.get() : Blocks.DIRT;
     }
 
     public static void register(IEventBus modEventBus) {

@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "mantle:loam_dirt",
+    "mantle:silt_dirt",
+    "mantle:clay_dirt",
+    "mantle:sandy_dirt",
+    "mantle:stony_dirt"
+  ]
+}

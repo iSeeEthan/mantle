@@ -35,17 +35,35 @@ public final class Caves {
         this.floorY = floorY;
     }
 
-    public boolean carved(int wx, int y, int wz, int solidTop, double surfaceY) {
-        if (y <= floorY + FLOOR_MARGIN) return false;
-        if (y >= solidTop - SURFACE_MARGIN) return false;
+    public static final class Column {
+        double sx, sz;
+        double soluble;
+        int solidTop;
+        boolean trivial;
+    }
 
-        double wxd = wx, wzd = wz, yd = y;
+    public Column column(int wx, int wz, int solidTop, double surfaceY, Column out) {
+        out.solidTop = solidTop;
+        out.trivial = solidTop - SURFACE_MARGIN <= floorY + FLOOR_MARGIN;
+        if (out.trivial) return out;
 
+        double wxd = wx, wzd = wz;
         double wpx = warp.fbm(wxd / 220.0, wzd / 220.0, 3, 2.0, 0.5) * 18.0;
         double wpz = warp.fbm((wxd + 4096) / 220.0, (wzd - 4096) / 220.0, 3, 2.0, 0.5) * 18.0;
-        double sx = wxd + wpx, sz = wzd + wpz;
+        out.sx = wxd + wpx;
+        out.sz = wzd + wpz;
+        out.soluble = solubility(wx, wz, surfaceY);
+        return out;
+    }
 
-        double soluble = solubility(wx, wz, surfaceY);
+    public boolean carved(Column ctx, int y) {
+        if (ctx.trivial) return false;
+        if (y <= floorY + FLOOR_MARGIN) return false;
+        if (y >= ctx.solidTop - SURFACE_MARGIN) return false;
+
+        double yd = y;
+        double sx = ctx.sx, sz = ctx.sz;
+        double soluble = ctx.soluble;
 
         double tunnelRadius = TUNNEL_RADIUS * (1.0 + 0.5 * soluble);
         double secondaryRadius = SECONDARY_RADIUS * (1.0 + 0.5 * soluble);
@@ -58,12 +76,16 @@ public final class Caves {
         double b2 = tunnelB.noise2(sz / SECONDARY_SCALE_XZ - 7.1, yd / (TUNNEL_SCALE_Y * 0.8) + 5.0);
         if (b * b + b2 * b2 < secondaryRadius) return true;
 
-        double depthFade = depthFade(y, solidTop);
+        double depthFade = depthFade(y, ctx.solidTop);
         double cheeseThreshold = CHEESE_THRESHOLD - 0.05 * soluble - 0.05 * depthFade;
         double c = cheese.fbm(sx / CHEESE_SCALE, yd / (CHEESE_SCALE * 0.6), 3, 2.0, 0.5);
         double c2 = cheese.fbm(sz / CHEESE_SCALE + 19.0, yd / (CHEESE_SCALE * 0.6) - 13.0, 3, 2.0, 0.5);
         double cheeseVal = Math.max(Math.abs(c), Math.abs(c2));
         return cheeseVal > cheeseThreshold;
+    }
+
+    public boolean carved(int wx, int y, int wz, int solidTop, double surfaceY) {
+        return carved(column(wx, wz, solidTop, surfaceY, new Column()), y);
     }
 
     private double solubility(int wx, int wz, double surfaceY) {

@@ -37,6 +37,8 @@ public final class MantleWorld {
         return strata.typeAt(wx, wz, y, solidTopY(wx, wz));
     }
 
+    public Caves caves() { return caves; }
+
     public boolean caveAt(int wx, int y, int wz, int solidTop) {
         return caves.carved(wx, y, wz, solidTop, sim.surfaceY(wx, wz));
     }
