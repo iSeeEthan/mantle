@@ -4,6 +4,10 @@ import com.iseeethan.mantle.world.Locator;
 import com.iseeethan.mantle.world.MantleWorld;
 import com.iseeethan.mantle.world.gen.biome.MantleBiomeClassifier;
 import com.iseeethan.mantle.world.gen.biome.MantleBiomes;
+import com.iseeethan.mantle.world.gen.ecology.Rainfall;
+import com.iseeethan.mantle.world.gen.ecology.Temperature;
+import com.iseeethan.mantle.world.gen.ecology.registries.RainfallConfig;
+import com.iseeethan.mantle.world.gen.ecology.registries.TemperatureConfig;
 import com.iseeethan.mantle.world.gen.tectonics.Climate;
 import com.iseeethan.mantle.world.gen.tectonics.Flora;
 import com.iseeethan.mantle.world.gen.tectonics.PlateSim;
@@ -120,6 +124,9 @@ public final class MantleCommand {
         src.sendSuccess(() -> line("Soil", pretty(soil.type.name()) + ", depth " + soil.depth
                 + ", wetness " + pct(soil.wetness)), false);
         src.sendSuccess(() -> line("Climate", "rain " + pct(rain) + ", temp " + pct(temp)), false);
+        double bandTemp = new Temperature(sim.seed(), TemperatureConfig.DEFAULT, PlateSim.WORLD).getTemperature(wx, wz);
+        double bandRain = new Rainfall(sim.seed(), RainfallConfig.DEFAULT, PlateSim.WORLD).getRainfall(wx, wz);
+        src.sendSuccess(() -> line("Ecology", "band temp " + pct(bandTemp) + ", band rain " + pct(bandRain)), false);
         src.sendSuccess(() -> line("Erosion", "slope " + fmt(slope) + ", flow " + flow
                 + ", erodibility " + fmt(erod)), false);
         src.sendSuccess(() -> line("Vegetation", pretty(cover.biome.name()) + ", trees "
