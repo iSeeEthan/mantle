@@ -3,10 +3,10 @@
   "temperature": 0.2,
   "downfall": 0.5,
   "effects": {
-    "fog_color": 2117792,
-    "water_color": 4020148,
+    "fog_color": 12638463,
+    "water_color": 4159204,
     "water_fog_color": 329011,
-    "sky_color": 8954072,
+    "sky_color": 8233727,
     "mood_sound": {
       "sound": "minecraft:ambient.cave",
       "tick_delay": 6000,
@@ -15,15 +15,41 @@
     }
   },
   "spawners": {
-      "monster": [{ "type": "minecraft:drowned", "weight": 5, "minCount": 1, "maxCount": 1 }],
-      "creature": [{ "type": "minecraft:cod", "weight": 10, "minCount": 3, "maxCount": 6 }, { "type": "minecraft:salmon", "weight": 5, "minCount": 1, "maxCount": 5 }, { "type": "minecraft:squid", "weight": 4, "minCount": 1, "maxCount": 4 }],
-      "ambient": [],
-      "axolotls": [],
-      "underground_water_creature": [],
-      "water_creature": [],
-      "water_ambient": [],
-      "misc": []
-    },
+    "monster": [
+      {
+        "type": "minecraft:drowned",
+        "weight": 5,
+        "minCount": 1,
+        "maxCount": 1
+      }
+    ],
+    "creature": [
+      {
+        "type": "minecraft:cod",
+        "weight": 10,
+        "minCount": 3,
+        "maxCount": 6
+      },
+      {
+        "type": "minecraft:salmon",
+        "weight": 5,
+        "minCount": 1,
+        "maxCount": 5
+      },
+      {
+        "type": "minecraft:squid",
+        "weight": 4,
+        "minCount": 1,
+        "maxCount": 4
+      }
+    ],
+    "ambient": [],
+    "axolotls": [],
+    "underground_water_creature": [],
+    "water_creature": [],
+    "water_ambient": [],
+    "misc": []
+  },
   "spawn_costs": {},
   "carvers": {},
   "features": []

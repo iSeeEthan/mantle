@@ -32,11 +32,12 @@ public class MantleChunkGenerator extends ChunkGenerator {
     public static final MapCodec<MantleChunkGenerator> CODEC =
             RecordCodecBuilder.mapCodec(instance -> instance.group(
                     BiomeSource.CODEC.fieldOf("biome_source").forGetter(g -> g.biomeSource),
-                    com.mojang.serialization.Codec.BOOL.optionalFieldOf("debug", false).forGetter(g -> g.debug)
+                    MantleGenConfig.CODEC.optionalFieldOf("config", new MantleGenConfig()).forGetter(g -> g.config)
             ).apply(instance, MantleChunkGenerator::new));
 
     private static final int SEA_LEVEL = MantleWorld.SEA_Y;
 
+    private final MantleGenConfig config;
     private final boolean debug;
 
     private final BlockState stone = Blocks.STONE.defaultBlockState();
@@ -45,6 +46,11 @@ public class MantleChunkGenerator extends ChunkGenerator {
 
     private volatile java.util.EnumMap<Strata.Rock, BlockState> rockStates;
     private volatile java.util.EnumMap<com.iseeethan.mantle.world.gen.tectonics.Soil.Type, BlockState> soilStates;
+    private volatile java.util.Map<String, BlockState> oreStates;
+    private volatile BlockState deepslateState;
+    private volatile OreVeins oreVeins;
+    private volatile long oreVeinsSeed = Long.MIN_VALUE;
+
 
     private BlockState rockState(Strata.Rock rock) {
         java.util.EnumMap<Strata.Rock, BlockState> map = rockStates;
@@ -56,6 +62,40 @@ public class MantleChunkGenerator extends ChunkGenerator {
             rockStates = map;
         }
         return map.get(rock);
+    }
+
+    private BlockState oreState(MantleBlocks.Host host, MantleBlocks.Ore ore) {
+        java.util.Map<String, BlockState> map = oreStates;
+        if (map == null) {
+            map = new java.util.HashMap<>();
+            for (MantleBlocks.Host h : MantleBlocks.Host.values()) {
+                for (MantleBlocks.Ore o : MantleBlocks.Ore.values()) {
+                    map.put(h.name() + "_" + o.name(), MantleBlocks.forOre(h, o).defaultBlockState());
+                }
+            }
+            oreStates = map;
+        }
+        return map.get(host.name() + "_" + ore.name());
+    }
+
+    private BlockState deepslateState() {
+        BlockState s = deepslateState;
+        if (s == null) {
+            s = MantleBlocks.deepslate().defaultBlockState();
+            deepslateState = s;
+        }
+        return s;
+    }
+
+    private OreVeins oreVeins() {
+        long seed = worldSeed.get();
+        OreVeins v = oreVeins;
+        if (v == null || oreVeinsSeed != seed) {
+            v = new OreVeins(seed, config.oreDensity);
+            oreVeins = v;
+            oreVeinsSeed = seed;
+        }
+        return v;
     }
 
     private BlockState soilState(com.iseeethan.mantle.world.gen.tectonics.Soil.Type type) {
@@ -76,12 +116,27 @@ public class MantleChunkGenerator extends ChunkGenerator {
     private volatile long coverNoiseSeed = Long.MIN_VALUE;
 
     public MantleChunkGenerator(BiomeSource biomeSource) {
-        this(biomeSource, false);
+        this(biomeSource, new MantleGenConfig());
     }
 
     public MantleChunkGenerator(BiomeSource biomeSource, boolean debug) {
+        this(biomeSource, debugConfig(debug));
+    }
+
+    public MantleChunkGenerator(BiomeSource biomeSource, MantleGenConfig config) {
         super(biomeSource);
-        this.debug = debug;
+        this.config = config;
+        this.debug = config.debug;
+    }
+
+    private static MantleGenConfig debugConfig(boolean debug) {
+        MantleGenConfig c = new MantleGenConfig();
+        c.debug = debug;
+        return c;
+    }
+
+    public MantleGenConfig config() {
+        return config;
     }
 
     public boolean isDebug() {
@@ -102,7 +157,7 @@ public class MantleChunkGenerator extends ChunkGenerator {
 
     public void bindSeed(long seed) {
         if (worldSeed.getAndSet(seed) != seed || world == null) {
-            world = MantleWorld.forSeed(seed);
+            world = MantleWorld.forSeed(seed, config.toParams());
         }
     }
 
@@ -170,7 +225,14 @@ public class MantleChunkGenerator extends ChunkGenerator {
                 return soilState(soilType);
             }
         }
-        return rockState(w.strata().typeAt(strataCol, y));
+        Strata.Rock rock = w.strata().typeAt(strataCol, y);
+        boolean deep = y < config.oreDeepslateLevel;
+        MantleBlocks.Host host = deep ? MantleBlocks.Host.DEEPSLATE : MantleBlocks.Host.of(rock);
+        MantleBlocks.Ore ore = oreVeins().oreAt(wx, y, wz);
+        if (ore != null) {
+            return oreState(host, ore);
+        }
+        return deep ? deepslateState() : rockState(rock);
     }
 
     @Override
@@ -216,7 +278,7 @@ public class MantleChunkGenerator extends ChunkGenerator {
                 for (int y = minY; y <= Math.max(stoneTop, waterTop); y++) {
                     BlockState state;
                     if (y <= stoneTop) {
-                        if (w.caves().carved(cavesCol, y)) {
+                        if (config.enableCaves && w.caves().carved(cavesCol, y)) {
                             continue;
                         }
                         state = surfaceState(w, wx, wz, y, stoneTop, soilTop, strataCol, soilDepth, soilType);

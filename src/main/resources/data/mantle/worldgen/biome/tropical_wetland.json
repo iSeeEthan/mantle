@@ -3,12 +3,10 @@
   "temperature": 0.9,
   "downfall": 1.0,
   "effects": {
-    "fog_color": 4169848,
-    "water_color": 4691306,
-    "water_fog_color": 663576,
-    "sky_color": 9423040,
-    "grass_color": 6342720,
-    "foliage_color": 4372511,
+    "fog_color": 12638463,
+    "water_color": 4159204,
+    "water_fog_color": 329011,
+    "sky_color": 7842047,
     "mood_sound": {
       "sound": "minecraft:ambient.cave",
       "tick_delay": 6000,
@@ -17,15 +15,53 @@
     }
   },
   "spawners": {
-      "monster": [{ "type": "minecraft:zombie", "weight": 95, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:skeleton", "weight": 100, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:spider", "weight": 100, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:creeper", "weight": 100, "minCount": 4, "maxCount": 4 }],
-      "creature": [{ "type": "minecraft:frog", "weight": 10, "minCount": 2, "maxCount": 5 }, { "type": "minecraft:chicken", "weight": 10, "minCount": 4, "maxCount": 4 }],
-      "ambient": [],
-      "axolotls": [],
-      "underground_water_creature": [],
-      "water_creature": [],
-      "water_ambient": [],
-      "misc": []
-    },
+    "monster": [
+      {
+        "type": "minecraft:zombie",
+        "weight": 95,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:skeleton",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:spider",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:creeper",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      }
+    ],
+    "creature": [
+      {
+        "type": "minecraft:frog",
+        "weight": 10,
+        "minCount": 2,
+        "maxCount": 5
+      },
+      {
+        "type": "minecraft:chicken",
+        "weight": 10,
+        "minCount": 4,
+        "maxCount": 4
+      }
+    ],
+    "ambient": [],
+    "axolotls": [],
+    "underground_water_creature": [],
+    "water_creature": [],
+    "water_ambient": [],
+    "misc": []
+  },
   "spawn_costs": {},
   "carvers": {},
   "features": []

@@ -7,15 +7,15 @@ public final class Caves {
     private static final int FLOOR_MARGIN = 6;
     private static final int SURFACE_MARGIN = 6;
 
-    private static final double TUNNEL_SCALE_XZ = 110.0;
-    private static final double TUNNEL_SCALE_Y = 60.0;
-    private static final double TUNNEL_RADIUS = 0.016;
+    private static final double TUNNEL_SCALE_XZ = 130.0;
+    private static final double TUNNEL_SCALE_Y = 90.0;
+    private static final double TUNNEL_RADIUS = 0.028;
 
-    private static final double SECONDARY_SCALE_XZ = 72.0;
-    private static final double SECONDARY_RADIUS = 0.012;
+    private static final double SECONDARY_SCALE_XZ = 84.0;
+    private static final double SECONDARY_RADIUS = 0.022;
 
-    private static final double CHEESE_SCALE = 30.0;
-    private static final double CHEESE_THRESHOLD = 0.965;
+    private static final double CHEESE_SCALE = 34.0;
+    private static final double CHEESE_THRESHOLD = 0.90;
 
     private static final double KARST_BAND = 70.0;
 
@@ -77,7 +77,7 @@ public final class Caves {
         if (b * b + b2 * b2 < secondaryRadius) return true;
 
         double depthFade = depthFade(y, ctx.solidTop);
-        double cheeseThreshold = CHEESE_THRESHOLD - 0.05 * soluble - 0.05 * depthFade;
+        double cheeseThreshold = CHEESE_THRESHOLD - 0.06 * soluble - 0.10 * depthFade;
         double c = cheese.fbm(sx / CHEESE_SCALE, yd / (CHEESE_SCALE * 0.6), 3, 2.0, 0.5);
         double c2 = cheese.fbm(sz / CHEESE_SCALE + 19.0, yd / (CHEESE_SCALE * 0.6) - 13.0, 3, 2.0, 0.5);
         double cheeseVal = Math.max(Math.abs(c), Math.abs(c2));

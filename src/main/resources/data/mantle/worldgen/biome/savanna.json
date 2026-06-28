@@ -3,12 +3,10 @@
   "temperature": 0.85,
   "downfall": 0.15,
   "effects": {
-    "fog_color": 6987936,
-    "water_color": 7315632,
+    "fog_color": 12638463,
+    "water_color": 4159204,
     "water_fog_color": 329011,
-    "sky_color": 12110032,
-    "grass_color": 12564309,
-    "foliage_color": 11445295,
+    "sky_color": 7907327,
     "mood_sound": {
       "sound": "minecraft:ambient.cave",
       "tick_delay": 6000,
@@ -17,15 +15,59 @@
     }
   },
   "spawners": {
-      "monster": [{ "type": "minecraft:zombie", "weight": 95, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:skeleton", "weight": 100, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:spider", "weight": 100, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:creeper", "weight": 100, "minCount": 4, "maxCount": 4 }],
-      "creature": [{ "type": "minecraft:horse", "weight": 1, "minCount": 2, "maxCount": 6 }, { "type": "minecraft:cow", "weight": 8, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:sheep", "weight": 2, "minCount": 4, "maxCount": 4 }],
-      "ambient": [],
-      "axolotls": [],
-      "underground_water_creature": [],
-      "water_creature": [],
-      "water_ambient": [],
-      "misc": []
-    },
+    "monster": [
+      {
+        "type": "minecraft:zombie",
+        "weight": 95,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:skeleton",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:spider",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:creeper",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      }
+    ],
+    "creature": [
+      {
+        "type": "minecraft:horse",
+        "weight": 1,
+        "minCount": 2,
+        "maxCount": 6
+      },
+      {
+        "type": "minecraft:cow",
+        "weight": 8,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:sheep",
+        "weight": 2,
+        "minCount": 4,
+        "maxCount": 4
+      }
+    ],
+    "ambient": [],
+    "axolotls": [],
+    "underground_water_creature": [],
+    "water_creature": [],
+    "water_ambient": [],
+    "misc": []
+  },
   "spawn_costs": {},
   "carvers": {},
   "features": []

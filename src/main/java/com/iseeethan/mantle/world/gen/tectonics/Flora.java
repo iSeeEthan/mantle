@@ -133,19 +133,19 @@ public final class Flora {
                 out.grassDensity = 0.4; out.fernDensity = 0.04; out.flowerDensity = 0.06;
                 break;
             case TEMPERATE_FOREST:
-                out.treeDensity = 0.16; out.bushDensity = 0.07;
+                out.treeDensity = 0.095; out.bushDensity = 0.07;
                 out.grassDensity = 0.35; out.fernDensity = 0.12; out.flowerDensity = 0.05;
                 break;
             case RAINFOREST:
-                out.treeDensity = 0.24; out.bushDensity = 0.1;
+                out.treeDensity = 0.145; out.bushDensity = 0.1;
                 out.grassDensity = 0.3; out.fernDensity = 0.2; out.flowerDensity = 0.04;
                 break;
             case TAIGA:
-                out.treeDensity = 0.1; out.bushDensity = 0.09;
+                out.treeDensity = 0.06; out.bushDensity = 0.09;
                 out.grassDensity = 0.25; out.fernDensity = 0.14; out.flowerDensity = 0.02;
                 break;
             case BOREAL_FOREST:
-                out.treeDensity = 0.18; out.bushDensity = 0.06;
+                out.treeDensity = 0.11; out.bushDensity = 0.06;
                 out.grassDensity = 0.18; out.fernDensity = 0.16; out.flowerDensity = 0.015;
                 break;
             case ALPINE_TUNDRA:

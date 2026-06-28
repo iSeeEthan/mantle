@@ -3,12 +3,10 @@
   "temperature": 0.55,
   "downfall": 0.8,
   "effects": {
-    "fog_color": 4159204,
+    "fog_color": 12638463,
     "water_color": 4159204,
     "water_fog_color": 329011,
-    "sky_color": 10142944,
-    "grass_color": 8960875,
-    "foliage_color": 7383885,
+    "sky_color": 8037887,
     "mood_sound": {
       "sound": "minecraft:ambient.cave",
       "tick_delay": 6000,
@@ -17,15 +15,53 @@
     }
   },
   "spawners": {
-      "monster": [{ "type": "minecraft:zombie", "weight": 95, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:skeleton", "weight": 100, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:spider", "weight": 100, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:creeper", "weight": 100, "minCount": 4, "maxCount": 4 }],
-      "creature": [{ "type": "minecraft:cow", "weight": 4, "minCount": 4, "maxCount": 4 }, { "type": "minecraft:chicken", "weight": 6, "minCount": 4, "maxCount": 4 }],
-      "ambient": [],
-      "axolotls": [],
-      "underground_water_creature": [],
-      "water_creature": [],
-      "water_ambient": [],
-      "misc": []
-    },
+    "monster": [
+      {
+        "type": "minecraft:zombie",
+        "weight": 95,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:skeleton",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:spider",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:creeper",
+        "weight": 100,
+        "minCount": 4,
+        "maxCount": 4
+      }
+    ],
+    "creature": [
+      {
+        "type": "minecraft:cow",
+        "weight": 4,
+        "minCount": 4,
+        "maxCount": 4
+      },
+      {
+        "type": "minecraft:chicken",
+        "weight": 6,
+        "minCount": 4,
+        "maxCount": 4
+      }
+    ],
+    "ambient": [],
+    "axolotls": [],
+    "underground_water_creature": [],
+    "water_creature": [],
+    "water_ambient": [],
+    "misc": []
+  },
   "spawn_costs": {},
   "carvers": {},
   "features": []

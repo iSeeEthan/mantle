@@ -22,11 +22,19 @@ public final class MantleWorld {
     private final PlateSim sim;
     private final Strata strata;
     private final Caves caves;
+    private final int paramsHash;
 
-    private MantleWorld(long seed) {
-        this.sim = new PlateSim(seed);
+    private MantleWorld(long seed, PlateSim.Params params) {
+        this.sim = new PlateSim(seed, params);
         this.strata = sim.strata();
         this.caves = sim.caves();
+        this.paramsHash = paramsHash(params);
+    }
+
+    private static int paramsHash(PlateSim.Params p) {
+        return java.util.Objects.hash(p.seaFraction, p.landCurve, p.mountainTopY,
+                p.continentScale, p.erosionIntensity, p.riverDensity,
+                p.temperatureScale, p.rainfallScale, p.polarColdness, p.continentalDryness);
     }
 
     public PlateSim sim() { return sim; }
@@ -44,11 +52,16 @@ public final class MantleWorld {
     }
 
     public static MantleWorld forSeed(long seed) {
+        return forSeed(seed, new PlateSim.Params());
+    }
+
+    public static MantleWorld forSeed(long seed, PlateSim.Params params) {
+        int h = paramsHash(params);
         MantleWorld cur = CURRENT.get();
-        if (cur != null && cur.sim.seed() == seed) {
+        if (cur != null && cur.sim.seed() == seed && cur.paramsHash == h) {
             return cur;
         }
-        MantleWorld built = new MantleWorld(seed);
+        MantleWorld built = new MantleWorld(seed, params);
         CURRENT.set(built);
         return built;
     }

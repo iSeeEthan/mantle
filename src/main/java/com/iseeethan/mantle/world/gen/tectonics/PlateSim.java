@@ -28,6 +28,9 @@ public final class PlateSim {
 
     private static final int STREAM_STEPS = 70;
     private static final int STREAM_RECARVE_STEPS = 26;
+    private static final int SEDIMENT_PASSES = 8;
+    private static final int GLACIAL_ITERS = 4;
+    private static final int COASTAL_PASSES = 3;
     private static final float TALUS_LOW = 0.008f;
     private static final float TALUS_HIGH = 0.022f;
     private static final float TALUS_HI_REF = 1.2f;
@@ -39,6 +42,25 @@ public final class PlateSim {
 
     private static final double LAND_CURVE = 1.9;
 
+    public static final class Params {
+        public double seaFraction = SEA_FRACTION;
+        public double landCurve = LAND_CURVE;
+        public int mountainTopY = MOUNTAIN_TOP_Y;
+        public double continentScale = 1.0;
+        public double erosionIntensity = 1.0;
+        public double riverDensity = 1.0;
+        public double temperatureScale = 1.0;
+        public double rainfallScale = 1.0;
+        public double polarColdness = 1.0;
+        public double continentalDryness = 1.0;
+        public double sedimentStrength = 1.0;
+        public double glacialStrength = 1.0;
+        public double coastalStrength = 1.0;
+        public double ruggedness = 1.0;
+    }
+
+    private final Params params;
+
     private final long seed;
     private final GradientNoise warp;
     private final GradientNoise relief;
@@ -48,6 +70,7 @@ public final class PlateSim {
     private final Boundary boundary;
     private final Folding folding;
     private final Faulting faulting;
+    private final Glacial glacial;
     private final Strata strata;
     private final Erodibility erodibility;
     private final Karst karst;
@@ -65,6 +88,11 @@ public final class PlateSim {
     private static final int RIVER_ACCUM = 1600;
 
     public PlateSim(long seed) {
+        this(seed, new Params());
+    }
+
+    public PlateSim(long seed, Params params) {
+        this.params = params;
         this.seed = seed;
         this.warp = new GradientNoise(seed ^ 0x9E3779B97F4A7C15L);
         this.relief = new GradientNoise(seed ^ 0xC2B2AE3D27D4EB4FL);
@@ -74,18 +102,20 @@ public final class PlateSim {
         this.boundary = new Boundary(seed);
         this.folding = new Folding(seed, SEA_Y);
         this.faulting = new Faulting(seed, SEA_Y);
+        this.glacial = new Glacial(seed, SEA_Y, HALF, params.polarColdness, params.temperatureScale);
         this.strata = new Strata(seed, SEA_Y);
         this.erodibility = new Erodibility(seed, strata, SEA_Y);
         this.karst = new Karst(seed, strata, SEA_Y, SHORE_Y);
         this.caves = new Caves(seed, strata, FLOOR_Y);
-        this.climate = new Climate(seed, this, SEA_Y);
+        this.climate = new Climate(seed, this, SEA_Y, params);
         this.soil = new Soil(seed, this, climate, SEA_Y);
         this.flora = new Flora(seed, SEA_Y);
         this.elev = new float[N * N];
         build();
     }
 
-    private PlateSim(long seed, boolean previewOnly) {
+    private PlateSim(long seed, boolean previewOnly, Params params) {
+        this.params = params;
         this.seed = seed;
         this.warp = new GradientNoise(seed ^ 0x9E3779B97F4A7C15L);
         this.relief = new GradientNoise(seed ^ 0xC2B2AE3D27D4EB4FL);
@@ -95,6 +125,7 @@ public final class PlateSim {
         this.boundary = new Boundary(seed);
         this.folding = null;
         this.faulting = null;
+        this.glacial = null;
         this.strata = null;
         this.erodibility = null;
         this.karst = null;
@@ -106,7 +137,11 @@ public final class PlateSim {
     }
 
     public static float[] previewRelief(long seed, int res) {
-        PlateSim p = new PlateSim(seed, true);
+        return previewRelief(seed, res, new Params());
+    }
+
+    public static float[] previewRelief(long seed, int res, Params params) {
+        PlateSim p = new PlateSim(seed, true, params);
         int n = res;
         double cell = (double) WORLD / n;
         float[] r = new float[n * n];
@@ -128,16 +163,113 @@ public final class PlateSim {
             double above = r[i] - seaRaw;
             uplift[i] = above > 0 ? (float) (above * scale) : 0f;
         }
-        StreamPower.evolve(r, n, cell, seaRaw, uplift, 24);
+        int previewSteps = Math.max(1, (int) Math.round(24 * params.erosionIntensity));
+        StreamPower.evolve(r, n, cell, seaRaw, uplift, previewSteps);
 
         return p.mapRawToWorldY(r, n);
+    }
+
+    public static final class PreviewMaps {
+        public final int res;
+        public final float[] height;
+        public final float[] temperature;
+        public final float[] rainfall;
+
+        PreviewMaps(int res, float[] height, float[] temperature, float[] rainfall) {
+            this.res = res;
+            this.height = height;
+            this.temperature = temperature;
+            this.rainfall = rainfall;
+        }
+    }
+
+    public static PreviewMaps previewMaps(long seed, int res, Params params) {
+        float[] height = previewRelief(seed, res, params);
+        int n = res;
+        double cell = (double) WORLD / n;
+        GradientNoise humidity = new GradientNoise(seed ^ 0x68E31DA4FB1133A5L);
+        GradientNoise tempJitter = new GradientNoise(seed ^ 0xD1B54A32D192ED03L);
+
+        float[] temp = new float[n * n];
+        float[] rain = new float[n * n];
+        double poleZ = HALF;
+
+        for (int j = 0; j < n; j++) {
+            double wz = (j + 0.5) * cell - HALF;
+            for (int i = 0; i < n; i++) {
+                double wx = (i + 0.5) * cell - HALF;
+                double h = height[j * n + i];
+
+                double cont = gridContinentality(height, n, i, j);
+
+                double wobble = tempJitter.fbm(wx / 2400.0, wz / 2400.0, 3, 2.0, 0.5) * 900.0;
+                double lat = clamp((Math.abs(wz + wobble)) / poleZ, 0.0, 1.0);
+                double latTemp = 1.0 - clamp(lat * params.polarColdness, 0.0, 1.0);
+                double above = h - SEA_Y;
+                double lapse = clamp(above / 620.0, 0.0, 1.0);
+                double t = latTemp * 0.70 - lapse * 0.44 + 0.5 * 0.30;
+                t += (t - 0.5) * (0.22 * cont);
+                t += 0.04 * tempJitter.noise2(wx / 520.0, wz / 520.0);
+                t = 0.5 + (t - 0.5) * params.temperatureScale;
+                temp[j * n + i] = (float) clamp(t, 0.0, 1.0);
+
+                double base = 0.5 + 0.5 * humidity.fbm(wx / 3200.0, wz / 3200.0, 4, 2.0, 0.5);
+                double det = 0.5 + 0.5 * humidity.fbm((wx + 5000) / 760.0, (wz - 5000) / 760.0, 3, 2.1, 0.5);
+                double oro = gridOrographic(height, n, cell, i, j);
+                double r = base * 0.52 + det * 0.2 + 0.32 * oro + 0.2 * (1.0 - cont);
+                r -= 0.4 * cont * cont * params.continentalDryness;
+                r = 0.5 + (r - 0.5) * params.rainfallScale;
+                rain[j * n + i] = (float) clamp(r, 0.0, 1.0);
+            }
+        }
+        return new PreviewMaps(n, height, temp, rain);
+    }
+
+    private static double gridContinentality(float[] height, int n, int i, int j) {
+        int rad = Math.max(1, n / 16);
+        double nearOcean = rad;
+        for (int dj = -rad; dj <= rad; dj += Math.max(1, rad / 3)) {
+            for (int di = -rad; di <= rad; di += Math.max(1, rad / 3)) {
+                int ii = i + di, jj = j + dj;
+                if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue;
+                if (height[jj * n + ii] < SEA_Y) {
+                    double d = Math.sqrt(di * di + dj * dj);
+                    if (d < nearOcean) nearOcean = d;
+                }
+            }
+        }
+        return clamp(nearOcean / rad, 0.0, 1.0);
+    }
+
+    private static double gridOrographic(float[] height, int n, double cell, int i, int j) {
+        double wx = 0.86, wz = 0.51;
+        int steps = 5;
+        double stepCells = Math.max(1.0, 130.0 / cell);
+        double here = sampleGrid(height, n, i, j);
+        double prev = sampleGrid(height, n, (int) (i - wx * stepCells * steps), (int) (j - wz * stepCells * steps));
+        double moisture = 0.0, shadow = 0.0;
+        for (int s = steps - 1; s >= 0; s--) {
+            double h = sampleGrid(height, n, (int) (i - wx * stepCells * s), (int) (j - wz * stepCells * s));
+            double climb = (h - prev) / 120.0;
+            if (climb > 0) { moisture += climb; shadow += climb; }
+            else { shadow += climb * 0.6; }
+            prev = h;
+        }
+        double lift = clamp((here - prev) / 110.0, -1.0, 1.0);
+        return clamp(0.5 + 0.5 * lift + 0.25 * moisture - 0.42 * Math.max(0, shadow - lift * 1.4), -0.5, 1.0);
+    }
+
+    private static double sampleGrid(float[] g, int n, int i, int j) {
+        if (i < 0) i = 0; else if (i >= n) i = n - 1;
+        if (j < 0) j = 0; else if (j >= n) j = n - 1;
+        return g[j * n + i];
     }
 
     private float[] mapRawToWorldY(float[] r, int n) {
         int len = r.length;
         float[] sorted = r.clone();
         java.util.Arrays.sort(sorted);
-        int seaRank = (int) (SEA_FRACTION * (len - 1));
+        int seaRank = (int) (params.seaFraction * (len - 1));
         int landCount = Math.max(1, (len - 1) - seaRank);
         float[] y = new float[len];
         for (int idx = 0; idx < len; idx++) {
@@ -148,8 +280,8 @@ public final class PlateSim {
                 y[idx] = (float) (SEA_Y - t * (SEA_Y - FLOOR_Y));
             } else {
                 double pr = (double) (rank - seaRank) / landCount;
-                double t = Math.pow(pr, LAND_CURVE);
-                y[idx] = (float) (SHORE_Y + t * (MOUNTAIN_TOP_Y - SHORE_Y));
+                double t = Math.pow(pr, params.landCurve);
+                y[idx] = (float) (SHORE_Y + t * (params.mountainTopY - SHORE_Y));
             }
         }
         return y;
@@ -179,9 +311,11 @@ public final class PlateSim {
 
         GenStatus.stage("Eroding terrain");
         float[] uplift = upliftField(raw);
-        StreamPower.evolve(raw, N, CELL, (float) seaThresholdRaw(raw), uplift, STREAM_STEPS);
+        int streamSteps = Math.max(1, (int) Math.round(STREAM_STEPS * params.erosionIntensity));
+        int thermalIters = Math.max(1, (int) Math.round(THERMAL_ITERS * params.erosionIntensity));
+        StreamPower.evolve(raw, N, CELL, (float) seaThresholdRaw(raw), uplift, streamSteps);
 
-        Thermal.erode(raw, N, THERMAL_ITERS, TALUS_LOW, TALUS_HIGH, TALUS_HI_REF);
+        Thermal.erode(raw, N, thermalIters, TALUS_LOW, TALUS_HIGH, TALUS_HI_REF);
 
         mapToWorldY(raw);
 
@@ -203,6 +337,25 @@ public final class PlateSim {
 
         Thermal.erode(elev, N, 12, MAX_STEP_BLOCKS, MAX_STEP_BLOCKS, 0f, reposeMul);
 
+        if (params.sedimentStrength > 0) {
+            GenStatus.stage("Depositing sediment");
+            int sedimentPasses = Math.max(1, (int) Math.round(SEDIMENT_PASSES * params.erosionIntensity * params.sedimentStrength));
+            Sediment.apply(elev, N, CELL, SEA_Y, sedimentPasses);
+        }
+
+        if (params.glacialStrength > 0) {
+            GenStatus.stage("Grinding glaciers");
+            int glacialIters = Math.max(1, (int) Math.round(GLACIAL_ITERS * params.glacialStrength));
+            glacial.apply(elev, N, CELL, HALF, glacialIters, params.erosionIntensity * params.glacialStrength);
+            Thermal.erode(elev, N, 8, MAX_STEP_BLOCKS, MAX_STEP_BLOCKS, 0f, reposeMul);
+        }
+
+        if (params.coastalStrength > 0) {
+            GenStatus.stage("Shaping coastlines");
+            int coastalPasses = Math.max(1, (int) Math.round(COASTAL_PASSES * params.coastalStrength));
+            Coastal.apply(elev, N, CELL, SEA_Y, coastalPasses);
+        }
+
         smoothGridResidual(elev, N, 8);
         raw = null;
 
@@ -211,7 +364,9 @@ public final class PlateSim {
         smoothGridResidual(elevFine, NH, 2);
 
         GenStatus.stage("Computing rivers and lakes");
-        hydro = Hydrology.build(elevFine, NH, SEA_Y, RIVER_ACCUM, CELLH, HALF);
+        int riverAccum = params.riverDensity <= 0.0 ? Integer.MAX_VALUE
+                : Math.max(64, (int) Math.round(RIVER_ACCUM / params.riverDensity));
+        hydro = Hydrology.build(elevFine, NH, SEA_Y, riverAccum, CELLH, HALF);
 
         GenStatus.stage("Dissolving karst");
         karst.apply(elevFine, NH, CELLH, HALF);
@@ -286,7 +441,7 @@ public final class PlateSim {
     private double seaThresholdRaw(float[] r) {
         float[] s = r.clone();
         java.util.Arrays.sort(s);
-        return s[(int) (SEA_FRACTION * (s.length - 1))];
+        return s[(int) (params.seaFraction * (s.length - 1))];
     }
 
     private static final double UPLIFT_RATE = 0.0025;
@@ -350,9 +505,10 @@ public final class PlateSim {
         double base = contact.base;
         double boundary = this.boundary.contribution(sx, sz, contact);
 
+        double cs = params.continentScale;
         double landish = clamp((base + boundary + 0.35) * 1.6, 0.0, 1.0);
         double continental = clamp((base + 0.4) * 1.4, 0.0, 1.0);
-        double regional = relief.fbm(wx / 2600.0, wz / 2600.0, 5, 2.0, 0.5);
+        double regional = relief.fbm(wx / (2600.0 * cs), wz / (2600.0 * cs), 5, 2.0, 0.5);
         double hills    = relief.fbm((wx + 1234) / 900.0, (wz - 4321) / 900.0, 5, 2.05, 0.5);
         double rolling  = relief.fbm((wx - 5678) / 420.0, (wz + 8765) / 420.0, 5, 2.1, 0.5);
         double detail   = relief.fbm(wx / 220.0, wz / 220.0, 4, 2.2, 0.5);
@@ -376,9 +532,9 @@ public final class PlateSim {
 
         float[] sorted = r.clone();
         java.util.Arrays.sort(sorted);
-        seaThreshold = sorted[(int) (SEA_FRACTION * (n - 1))];
+        seaThreshold = sorted[(int) (params.seaFraction * (n - 1))];
 
-        int seaRank = (int) (SEA_FRACTION * (n - 1));
+        int seaRank = (int) (params.seaFraction * (n - 1));
         int landCount = Math.max(1, (n - 1) - seaRank);
 
         for (int idx = 0; idx < n; idx++) {
@@ -394,8 +550,8 @@ public final class PlateSim {
             } else {
 
                 double p = (double) (rank - seaRank) / landCount;
-                double t = Math.pow(p, LAND_CURVE);
-                y = SHORE_Y + t * (MOUNTAIN_TOP_Y - SHORE_Y);
+                double t = Math.pow(p, params.landCurve);
+                y = SHORE_Y + t * (params.mountainTopY - SHORE_Y);
             }
             elev[idx] = (float) y;
         }
@@ -473,9 +629,9 @@ public final class PlateSim {
     private static final double DETAIL_SCALE = 38.0;
     private static final double DETAIL_FINE_SCALE = 14.0;
     private static final double RIDGE_SCALE = 120.0;
-    private static final double LAND_BASE_AMP = 1.4;
-    private static final double SLOPE_AMP = 26.0;
-    private static final double RIDGE_AMP = 22.0;
+    private static final double LAND_BASE_AMP = 0.7;
+    private static final double SLOPE_AMP = 13.0;
+    private static final double RIDGE_AMP = 11.0;
     private static final double RIDGE_START = 140.0;
     private static final double RIDGE_FULL = 420.0;
 
@@ -496,7 +652,8 @@ public final class PlateSim {
         double fine = detail.fbm(wx / DETAIL_FINE_SCALE, wz / DETAIL_FINE_SCALE, 3, 2.1, 0.5);
         double bumps = rough * 0.7 + fine * 0.3;
 
-        double amp = LAND_BASE_AMP + SLOPE_AMP * slopeGain;
+        double rug = params.ruggedness;
+        double amp = (LAND_BASE_AMP + SLOPE_AMP * slopeGain) * rug;
         double d = bumps * amp * shore;
 
         double ridgeBlend = clamp((above - RIDGE_START) / (RIDGE_FULL - RIDGE_START), 0.0, 1.0);
@@ -504,7 +661,7 @@ public final class PlateSim {
             double rn = ridge.fbm(wx / RIDGE_SCALE, wz / RIDGE_SCALE, 5, 2.0, 0.5);
             double ridged = 1.0 - Math.abs(rn);
             ridged = ridged * ridged;
-            d += (ridged - 0.5) * RIDGE_AMP * ridgeBlend * (0.4 + 0.6 * slopeGain);
+            d += (ridged - 0.5) * RIDGE_AMP * rug * ridgeBlend * (0.4 + 0.6 * slopeGain);
         }
         return d;
     }

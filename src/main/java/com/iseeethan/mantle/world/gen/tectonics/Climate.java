@@ -35,11 +35,14 @@ public final class Climate {
     private final PlateSim sim;
     private final double seaY;
 
-    Climate(long seed, PlateSim sim, double seaY) {
+    private final PlateSim.Params params;
+
+    Climate(long seed, PlateSim sim, double seaY, PlateSim.Params params) {
         this.humidity = new GradientNoise(seed ^ 0x68E31DA4FB1133A5L);
         this.tempJitter = new GradientNoise(seed ^ 0xD1B54A32D192ED03L);
         this.sim = sim;
         this.seaY = seaY;
+        this.params = params;
     }
 
     public Sample sample(double wx, double wz, Sample out) {
@@ -61,7 +64,8 @@ public final class Climate {
         double orographic = orographicMoisture(wx, wz);
 
         double r = base * 0.52 + detail * 0.2 + 0.32 * orographic + 0.2 * (1.0 - cont);
-        r -= 0.4 * cont * cont;
+        r -= 0.4 * cont * cont * params.continentalDryness;
+        r = 0.5 + (r - 0.5) * params.rainfallScale;
         return clamp(r, 0.0, 1.0);
     }
 
@@ -95,7 +99,7 @@ public final class Climate {
     private double temperature(double wx, double wz, double cont) {
         double wobble = tempJitter.fbm(wx / 2400.0, wz / 2400.0, 3, 2.0, 0.5) * LATITUDE_WOBBLE;
         double lat = clamp((Math.abs(wz + wobble)) / POLE_Z, 0.0, 1.0);
-        double latTemp = 1.0 - lat;
+        double latTemp = 1.0 - clamp(lat * params.polarColdness, 0.0, 1.0);
 
         double above = sim.surfaceY(wx, wz) - seaY;
         double lapse = clamp(above / LAPSE_SPAN, 0.0, 1.0);
@@ -107,6 +111,7 @@ public final class Climate {
         t += swing;
 
         t += 0.04 * tempJitter.noise2(wx / 520.0, wz / 520.0);
+        t = 0.5 + (t - 0.5) * params.temperatureScale;
         return clamp(t, 0.0, 1.0);
     }
 
