@@ -1,0 +1,13 @@
+{
+  "base_frequency": 0.0006666666666666666,
+  "base_octaves": 6,
+  "base_lacunarity": 2.0,
+  "base_gain": 0.5,
+  "warp_frequency": 0.0014285714285714286,
+  "warp_octaves": 4,
+  "warp_lacunarity": 2.0,
+  "warp_gain": 0.5,
+  "warp_strength": 500.0,
+  "equator_falloff_power": 2.0,
+  "min_pole_temp_factor": 0.1
+}
